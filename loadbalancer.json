@@ -1,0 +1,129 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualNetwork1": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        "Subnet-1": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        "Subnet-2": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        "loadBalancerInternal1": {
+            "type": "string",
+            "metadata": {
+                "description": "description"
+            }
+        }
+
+    },
+    "functions": [],
+    "variables": {
+        "addressSpace": "10.0.0.0/20",
+        "subnet1AddressPrefix": "10.0.0.0/24",
+        "subnet2AddressPrefix": "10.0.1.0/24",
+        "frontendPrivateIP": "10.0.1.7"
+    },
+    "resources": [
+        {
+            "name": "[parameters('virtualNetwork1')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2023-11-01",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('addressSpace')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[parameters('Subnet-1')]",
+                        "properties": {
+                            "addressPrefix": "[variables('subnet1AddressPrefix')]"
+                        }
+                    },
+                    {
+                        "name": "[parameters('Subnet-2')]",
+                        "properties": {
+                            "addressPrefix": "[variables('subnet2AddressPrefix')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('loadBalancerInternal1')]",
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2023-11-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetwork1'))]"
+            ],
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "loadBalancerFrontEnd1",
+                        "properties": {
+                            "privateIPAddress": "[variables('frontendPrivateIP')]",
+                            "privateIPAllocationMethod": "Static",
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetwork1'), parameters('Subnet-2'))]"
+                            }
+
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "loadBalancerBackEndPool1"
+                    }
+                ],
+                "loadBalancingRules": [
+                    {
+                        "name": "LBRule1",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[resourceId('Microsoft.Network/loadBalancers/frontendIPConfigurations', parameters('loadBalancerInternal1'), 'loadBalancerFrontEnd1')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', parameters('loadBalancerInternal1'), 'loadBalancerBackEndPool1')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 80,
+                            "backendPort": 80,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[resourceId('Microsoft.Network/loadBalancers/probes',parameters('loadBalancerInternal1'), 'tcpProbe1')]"
+                            }
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "tcpProbe1",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "port": 80,
+                            "intervalInSeconds": 5,
+                            "numberOfProbes": 2
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {}
+}
